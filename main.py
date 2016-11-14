@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import time
-import tensorflow as tf 
+import tensorflow as tf
 import input_data
 import math
 
@@ -31,7 +31,7 @@ def mlp(input_,input_dim,output_dim,name="mlp"):
     with tf.variable_scope(name):
         w = tf.get_variable('w',[input_dim,output_dim],tf.float32,tf.random_normal_initializer(mean = 0.001,stddev=0.02))
         return tf.nn.relu(tf.matmul(input_,w))
-        
+
 def build_model_mlp(X_,_dropout):
 
     model = mlpnet(X_,_dropout)
@@ -55,13 +55,10 @@ def compute_accuracy(prediction,labels):
     for i, p in enumerate(prediction):
         if p < 0.5 and labels[i] == 1:
             correct += 1
-        elif p > 0.5 and labels[i] == 0:
+        elif p >= 0.5 and labels[i] == 0:
             correct += 1
     accu1 =  correct * 1.0 / len(prediction)
-    accu2 =  labels[prediction.ravel() < 0.5].mean()
-    if abs(accu1 - accu2) > 0.001
-        print("two accu is different, mine:%0.2f, origin:%0.2f"\
-                % (accu1, accu2))
+    #accu2 =  labels[prediction.ravel() < 0.5].mean()
     return accu1
     #return tf.reduce_mean(labels[prediction.ravel() < 0.5])
 def next_batch(s,e,inputs,labels):
@@ -69,7 +66,7 @@ def next_batch(s,e,inputs,labels):
     input2 = inputs[s:e,1]
     y= np.reshape(labels[s:e],(len(range(s,e)),1))
     return input1,input2,y
-    
+
 # Initializing the variables
 init = tf.initialize_all_variables()
 # the data, shuffled and split between train and test sets
