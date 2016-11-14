@@ -51,7 +51,18 @@ def contrastive_loss(y,d):
     return tf.reduce_sum(tmp +tmp2)/batch_size/2
 
 def compute_accuracy(prediction,labels):
-    return labels[prediction.ravel() < 0.5].mean()
+    correct = 0
+    for i, p in enumerate(prediction):
+        if p < 0.5 and labels[i] == 1:
+            correct += 1
+        elif p > 0.5 and labels[i] == 0:
+            correct += 1
+    accu1 =  correct * 1.0 / len(prediction)
+    accu2 =  labels[prediction.ravel() < 0.5].mean()
+    if abs(accu1 - accu2) > 0.001
+        print("two accu is different, mine:%0.2f, origin:%0.2f"\
+                % (accu1, accu2))
+    return accu1
     #return tf.reduce_mean(labels[prediction.ravel() < 0.5])
 def next_batch(s,e,inputs,labels):
     input1 = inputs[s:e,0]
@@ -118,7 +129,7 @@ with tf.Session() as sess:
                 print('tr_acc %0.2f' % tr_acc)
                 pdb.set_trace()
             avg_loss += loss_value
-            avg_acc +=tr_acc*100
+            avg_acc += tr_acc*100
         #print('epoch %d loss %0.2f' %(epoch,avg_loss/total_batch))
         duration = time.time() - start_time
         print('epoch %d  time: %f loss %0.5f acc %0.2f' %(epoch,duration,avg_loss/(total_batch),avg_acc/total_batch))
