@@ -27,23 +27,24 @@ def create_pairs(x, digit_indices):
     return np.array(pairs), np.array(labels)
 
 
-def mlp(input_,input_dim,output_dim,name="mlp"):
+def mlp(input_, w, name="mlp"):
     with tf.variable_scope(name):
-        w = tf.get_variable('w',[input_dim,output_dim],tf.float32,tf.random_normal_initializer(mean = 0.001,stddev=0.02))
         return tf.nn.relu(tf.matmul(input_,w))
 
-def build_model_mlp(X_,_dropout):
+def build_model_mlp(X_,_dropout, weights):
 
-    model = mlpnet(X_,_dropout)
+    model = mlpnet(X_,_dropout, weights)
     return model
 
-def mlpnet(image,_dropout):
-    l1 = mlp(image,784,128,name='l1')
+def mlpnet(image,_dropout, weights):
+    l1 = mlp(image, weights['l1'])
     l1 = tf.nn.dropout(l1,_dropout)
-    l2 = mlp(l1,128,128,name='l2')
+    l2 = mlp(l1, weights['l2'])
     l2 = tf.nn.dropout(l2,_dropout)
-    l3 = mlp(l2,128,128,name='l3')
+    l3 = mlp(l2, weights['l3'])
     return l3
+
+
 def contrastive_loss(y,d):
     tmp= y *tf.square(d)
     #tmp= tf.mul(y,tf.square(d))
@@ -84,15 +85,59 @@ tr_pairs, tr_y = create_pairs(X_train, digit_indices)
 digit_indices = [np.where(y_test == i)[0] for i in range(10)]
 te_pairs, te_y = create_pairs(X_test, digit_indices)
 
+def dis(image, weights, dropout_f):
+    l1 = tf.nn.relu(tf.matmul(image,weights['l1']))
+    l1 = tf.nn.dropout(l1, dropout_f)
+
+    l2 = tf.nn.relu(tf.matmul(l1,weights['l2']))
+    l2 = tf.nn.dropout(l2, dropout_f)
+
+    l3 = tf.nn.relu(tf.matmul(l2,weights['l3']))
+    l3 = tf.nn.dropout(l1, dropout_f)
+    return l3
+
+def mlp_network():
+
+    images_L = tf.placeholder(tf.float32,shape=([None,784]),name='L')
+    images_R = tf.placeholder(tf.float32,shape=([None,784]),name='R')
+    labels = tf.placeholder(tf.float32,shape=([None,1]),name='gt')
+    dropout_f = tf.placeholder("float")
+
+    weights = {
+        # 3x3 conv, 1 input, 16 outputs
+        'l1': tf.Variable(tf.random_normal([784, 128], mean = 0.001, stddev=0.02)),
+        'l2': tf.Variable(tf.random_normal([128, 128], mean = 0.001, stddev=0.02)),
+        'l3': tf.Variable(tf.random_normal([128, 128], mean = 0.001, stddev=0.02)),
+    }
+
+    model1 = dis(images_L, weights, dropout_f)
+    model2 = dis(images_R, weights, dropout_f)
+
+    tf.random_normal_initializer()
+
+    distance  = tf.sqrt(tf.reduce_sum(tf.pow(tf.sub(model1,model2),2),1,keep_dims=True))
+    loss = contrastive_loss(labels,distance)
+    #contrastice loss
+    t_vars = tf.trainable_variables()
+    d_vars  = [var for var in t_vars if 'l' in var.name]
+    batch = tf.Variable(0)
+    optimizer = tf.train.AdamOptimizer(learning_rate = 0.0001).minimize(loss)
+    #optimizer = tf.train.RMSPropOptimizer(0.0001,momentum=0.9,epsilon=1e-6).minimize(loss)
+    return images_L, images_R, labels, dropout_f, loss, distance, optimizer, model1, model2
+
 images_L = tf.placeholder(tf.float32,shape=([None,784]),name='L')
 images_R = tf.placeholder(tf.float32,shape=([None,784]),name='R')
 labels = tf.placeholder(tf.float32,shape=([None,1]),name='gt')
 dropout_f = tf.placeholder("float")
 
-with tf.variable_scope("siamese") as scope:
-    model1= build_model_mlp(images_L,dropout_f)
-    scope.reuse_variables()
-    model2 = build_model_mlp(images_R,dropout_f)
+weights = {
+    # 3x3 conv, 1 input, 16 outputs
+    'l1': tf.Variable(tf.random_normal([784, 128], mean = 0.001, stddev=0.02)),
+    'l2': tf.Variable(tf.random_normal([128, 128], mean = 0.001, stddev=0.02)),
+    'l3': tf.Variable(tf.random_normal([128, 128], mean = 0.001, stddev=0.02)),
+}
+model1= build_model_mlp(images_L,dropout_f, weights)
+model2 = build_model_mlp(images_R,dropout_f, weights)
 
 distance  = tf.sqrt(tf.reduce_sum(tf.pow(tf.sub(model1,model2),2),1,keep_dims=True))
 loss = contrastive_loss(labels,distance)
@@ -101,7 +146,7 @@ t_vars = tf.trainable_variables()
 d_vars  = [var for var in t_vars if 'l' in var.name]
 batch = tf.Variable(0)
 optimizer = tf.train.AdamOptimizer(learning_rate = 0.0001).minimize(loss)
-#optimizer = tf.train.RMSPropOptimizer(0.0001,momentum=0.9,epsilon=1e-6).minimize(loss)
+
 # Launch the graph
 with tf.Session() as sess:
     #sess.run(init)
